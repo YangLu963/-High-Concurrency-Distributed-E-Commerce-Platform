@@ -3,43 +3,70 @@ NexusCart is a demonstration project showcasing a microservices-based e-commerce
 
 This is a code demonstration project - it implements the architecture and patterns used in production systems but has not been load-tested at scale. The design principles and code structure reflect industry best practices for building scalable e-commerce platforms.
 🏗️ System Architecture
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            API Gateway                                       │
-│                    Spring Cloud Gateway · Rate Limiting · JWT Auth          │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                          │
-            ┌─────────────────────────────┼─────────────────────────────┐
-            │                             │                             │
-            ▼                             ▼                             ▼
-    ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-    │  Core Services  │          │  Data Services  │          │   ML Services   │
-    │  (Java 17)      │          │  (Mixed Stack)  │          │   (Python)      │
-    ├─────────────────┤          ├─────────────────┤          ├─────────────────┤
-    │ User Service    │          │ Product Service │          │ Recommendation  │
-    │  · JWT Auth     │          │  · ES Search    │          │    Engine       │
-    │  · Profiles     │          │  · Category     │          │                 │
-    ├─────────────────┤          ├─────────────────┤          ├─────────────────┤
-    │ Order Service   │          │ Inventory Srv   │          │  Data Pipeline  │
-    │  · State Machine│          │  · Redis Cache  │          │   · Kafka       │
-    │  · Sharding     │          │  · Stock Mgmt   │          │   · Faust       │
-    ├─────────────────┤          ├─────────────────┤          │   · PySpark     │
-    │ Payment Service │          │ Promotion Srv   │          ├─────────────────┤
-    │  · Stripe API   │          │  · Lua Scripts  │          │  Feature Store  │
-    │  · Webhooks     │          │  · Flash Sales  │          │   · Feast       │
-    └─────────────────┘          └─────────────────┘          │   · Redis       │
-            │                             │                    ├─────────────────┤
-            │                             │                    │  Model Training │
-            │                             │                    │   · XGBoost     │
-            │                             │                    │   · LightFM     │
-            │                             │                    │   · SHAP        │
-            └─────────────────────────────┼────────────────────┘
-                                          │
-                                          ▼
-                          ┌─────────────────────────────────┐
-                          │         Event Bus (Kafka)       │
-                          │  Order · Payment · Behavior     │
-                          │  Inventory · Promotion Events   │
-                          └─────────────────────────────────┘
+graph TB
+    subgraph "Client Layer"
+        A[Web Client] --> G[API Gateway]
+        B[Mobile Client] --> G
+    end
+    
+    subgraph "Gateway Layer"
+        G[Spring Cloud Gateway] --> |Route| CORE
+        G --> |Route| DATA
+        G --> |Route| ML
+    end
+    
+    subgraph "Core Services - Java/Spring"
+        CORE[Core Services]
+        US[User Service] --> US_DB[(User DB)]
+        OS[Order Service] --> OS_DB[(Order DB)]
+        PS[Payment Service]
+        
+        CORE --> US
+        CORE --> OS
+        CORE --> PS
+    end
+    
+    subgraph "Data Services - Java/Spring"
+        DATA[Data Services]
+        PROD[Product Service] --> PROD_DB[(Product DB)]
+        PROD --> ES[Elasticsearch]
+        INV[Inventory Service] --> INV_CACHE[(Redis Cache)]
+        PROMO[Promotion Service] --> PROMO_CACHE[(Redis Cache)]
+        
+        DATA --> PROD
+        DATA --> INV
+        DATA --> PROMO
+    end
+    
+    subgraph "ML Services - Python"
+        ML[ML Services]
+        DP[Data Pipeline] --> KAFKA
+        FS[Feature Store] --> FS_DB[(Feast/Redis)]
+        MT[Model Training] --> MODEL[(Model Registry)]
+        MS[Model Serving API]
+        
+        ML --> DP
+        ML --> FS
+        ML --> MT
+        ML --> MS
+    end
+    
+    subgraph "Event Bus"
+        KAFKA[Kafka Cluster]
+        OS -.->|Publish Events| KAFKA
+        PS -.->|Publish Events| KAFKA
+        DP -.->|Consume Events| KAFKA
+    end
+    
+    subgraph "External Services"
+        STRIPE[Stripe API]
+        PAYPAL[PayPal API]
+        PS --> STRIPE
+        PS --> PAYPAL
+    end
+    
+    MS --> OS
+    MS --> PROD
 
 
 📦 Complete Microservices Breakdown
