@@ -1,0 +1,68 @@
+groups:
+  - name: recommendation_alerts
+    interval: 30s
+    rules:
+      # API可用性告警
+      - alert: APIHighErrorRate
+        expr: rate(recommendation_requests_total{code=~"5.."}[5m]) / rate(recommendation_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API错误率过高"
+          description: "错误率超过5%持续2分钟"
+
+      # 延迟告警
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, rate(recommendation_latency_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99延迟超过500ms"
+
+      # CTR下降告警
+      - alert: CTRDrop
+        expr: (rate(item_clicks_total[1h]) / rate(item_impressions_total[1h])) < 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "点击率异常下降"
+          description: "CTR低于1%持续10分钟"
+
+      # 模型服务不可用
+      - alert: ModelUnavailable
+        expr: up{job="recommendation-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "模型服务不可用"
+
+      # 缓存命中率低
+      - alert: LowCacheHitRate
+        expr: rate(redis_hits_total[5m]) / (rate(redis_hits_total[5m]) + rate(redis_misses_total[5m])) < 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "缓存命中率低于30%"
+
+      # Kafka消费延迟
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka消费者延迟超过10000条"
+
+      # 特征存储超时
+      - alert: FeatureStoreTimeout
+        expr: rate(feast_online_request_duration_seconds_count{http_status="timeout"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "特征存储超时"

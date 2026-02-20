@@ -1,0 +1,89 @@
+import faust
+import numpy as np
+from datetime import datetime, timedelta
+from collections import defaultdict
+import redis
+from typing import Dict, List
+import json
+
+app = faust.App('feature_generator', broker='kafka://localhost:9092')
+
+# 定义特征事件
+class UserFeature(faust.Record):
+    user_id: str
+    feature_name: str
+    feature_value: float
+    timestamp: float
+    window: str  # 5min, 1hour, 1day
+
+# 输出topic
+feature_topic = app.topic('user-features', value_type=UserFeature)
+
+# 输入topic（复用behavior_consumer的topic）
+behavior_topic = app.topic('user-behavior', value_type=dict)
+
+@app.agent(behavior_topic)
+async def generate_features(behaviors):
+    """生成多种时间窗口的用户特征"""
+
+    # 使用Faust的Table存储窗口聚合数据
+    # 5分钟窗口（实时）
+    window_5min = app.Table('window_5min', default=lambda: defaultdict(float),
+                           partitions=8, recovery=True)
+
+    # 1小时窗口
+    window_1hour = app.Table('window_1hour', default=lambda: defaultdict(float),
+                            partitions=8, recovery=True)
+
+    async for behavior in behaviors:
+        user_id = behavior['user_id']
+        action = behavior['action']
+        item_id = behavior['item_id']
+        timestamp = behavior['timestamp']
+
+        # 获取当前时间窗口key
+        time_5min = int(timestamp / 300) * 300  # 5分钟粒度
+        time_1hour = int(timestamp / 3600) * 3600  # 1小时粒度
+
+        # 更新5分钟窗口计数
+        window_5min[f"{user_id}:{time_5min}:clicks"] += 1 if action == 'click' else 0
+        window_5min[f"{user_id}:{time_5min}:add_to_cart"] += 1 if action == 'add_to_cart' else 0
+        window_5min[f"{user_id}:{time_5min}:purchases"] += 1 if action == 'purchase' else 0
+
+        # 生成并发送5分钟特征
+        if should_emit_feature(timestamp, 300):  # 每5分钟发送一次
+            features = extract_window_features(user_id, time_5min, window_5min, '5min')
+            for feature in features:
+                await feature_topic.send(value=feature)
+
+def extract_window_features(user_id: str, window_time: int,
+                           window_table, window_name: str) -> List[UserFeature]:
+    """从窗口提取特征"""
+    features = []
+    timestamp = datetime.now().timestamp()
+
+    # 行为计数特征
+    for action in ['clicks', 'add_to_cart', 'purchases']:
+        count = window_table.get(f"{user_id}:{window_time}:{action}", 0)
+        features.append(UserFeature(
+            user_id=user_id,
+            feature_name=f"{action}_{window_name}",
+            feature_value=float(count),
+            timestamp=timestamp,
+            window=window_name
+        ))
+
+    # 转化率特征
+    clicks = window_table.get(f"{user_id}:{window_time}:clicks", 0)
+    purchases = window_table.get(f"{user_id}:{window_time}:purchases", 0)
+    if clicks > 0:
+        ctr = purchases / clicks
+        features.append(UserFeature(
+            user_id=user_id,
+            feature_name=f"ctr_{window_name}",
+            feature_value=ctr,
+            timestamp=timestamp,
+            window=window_name
+        ))
+
+    return features

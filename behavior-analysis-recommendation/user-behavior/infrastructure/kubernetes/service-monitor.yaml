@@ -1,0 +1,20 @@
+# service-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: recommendation-api-monitor
+  namespace: recommendation-system
+  labels:
+    app: recommendation-api
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: recommendation-api
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - recommendation-system

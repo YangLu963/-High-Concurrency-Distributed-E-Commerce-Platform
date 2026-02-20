@@ -1,0 +1,64 @@
+# prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# 告警配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# 规则文件
+rule_files:
+# - "alerts.yml"
+
+# 抓取配置
+scrape_configs:
+  # 推荐API服务
+  - job_name: 'recommendation-api'
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'api:8000'
+        labels:
+          service: 'recommendation'
+          environment: 'production'
+
+  # Kafka监控
+  - job_name: 'kafka'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'kafka-exporter:9308'
+        labels:
+          service: 'kafka'
+
+  # Redis监控
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'redis-exporter:9121'
+        labels:
+          service: 'redis'
+
+  # Spark作业监控
+  - job_name: 'spark'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'spark-master:8080'
+        labels:
+          service: 'spark'
+
+  # Node监控
+  - job_name: 'node'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+        labels:
+          service: 'node'

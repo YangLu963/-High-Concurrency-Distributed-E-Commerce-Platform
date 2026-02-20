@@ -1,0 +1,117 @@
+{
+  "dashboard": {
+    "title": "推荐系统监控",
+    "version": 1,
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "推荐请求QPS",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(recommendation_requests_total[1m])",
+            "legendFormat": "总请求"
+          },
+          {
+            "expr": "rate(recommendation_requests_total{page_type='home'}[1m])",
+            "legendFormat": "首页"
+          },
+          {
+            "expr": "rate(recommendation_requests_total{page_type='product_detail'}[1m])",
+            "legendFormat": "详情页"
+          }
+        ]
+      },
+      {
+        "title": "推荐延迟 (P99)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(recommendation_latency_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99延迟"
+          }
+        ]
+      },
+      {
+        "title": "点击率 (CTR)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(item_clicks_total[1h]) / rate(item_impressions_total[1h])",
+            "legendFormat": "CTR"
+          }
+        ]
+      },
+      {
+        "title": "活跃用户数",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
+        "targets": [
+          {
+            "expr": "active_users",
+            "legendFormat": "活跃用户"
+          }
+        ]
+      },
+      {
+        "title": "热门物品曝光TOP10",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "topk(10, sum(item_impressions_total) by (item_id))",
+            "format": "table",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "title": "模型版本分布",
+        "type": "pie",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(recommendation_requests_total) by (model_version)",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "特征存储延迟",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "rate(feast_online_request_duration_seconds_sum[1m]) / rate(feast_online_request_duration_seconds_count[1m])",
+            "legendFormat": "平均延迟"
+          }
+        ]
+      },
+      {
+        "title": "缓存命中率",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 20},
+        "targets": [
+          {
+            "expr": "rate(redis_hits_total[5m]) / (rate(redis_hits_total[5m]) + rate(redis_misses_total[5m]))",
+            "legendFormat": "命中率"
+          }
+        ]
+      },
+      {
+        "title": "Kafka消费延迟",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 20},
+        "targets": [
+          {
+            "expr": "kafka_consumer_lag",
+            "legendFormat": "消费者延迟"
+          }
+        ]
+      }
+    ]
+  }
+}

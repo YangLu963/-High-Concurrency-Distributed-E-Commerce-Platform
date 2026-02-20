@@ -1,0 +1,32 @@
+# kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: recommendation-system
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - deployment-api.yaml
+  - service-api.yaml
+  - hpa.yaml
+  - ingress.yaml
+  - service-monitor.yaml
+
+images:
+  - name: recommendation-api
+    newName: ${ECR_REPO}/recommendation-api
+    newTag: ${IMAGE_TAG}
+
+configMapGenerator:
+  - name: recommendation-config
+    behavior: merge
+    literals:
+      - MODEL_VERSION=${MODEL_VERSION}
+
+secretGenerator:
+  - name: recommendation-secrets
+    behavior: merge
+    literals:
+      - DB_PASSWORD=${DB_PASSWORD}
